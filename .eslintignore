@@ -1,0 +1,11 @@
+.DS_Store
+.idea
+/coverage/*
+!/coverage/.gitignore
+/logs/*
+!/logs/.gitignore
+/node_modules/
+/public/resources/css/bundle.css
+/public/resources/js/bundle.js
+/.env/
+/certs/

@@ -1,101 +1,95 @@
-const CronJob = require("cron").CronJob;
-const express = require("express");
-const axios = require("axios");
-require('dotenv').config();
-const moment = require("moment");
+const { CronJob } = require('cron');
+const express = require('express');
+const axios = require('axios');
+const moment = require('moment');
 const { v4: uuid } = require('uuid');
+
+require('dotenv').config();
 require('./initDB')();
 
-const SMS = require('./model/sms')
-const WeatherInfo = require('./model/weatherInfo')
+const SMS = require('./model/sms');
+const WeatherInfo = require('./model/weatherInfo');
 
-app = express();
-const env = process.env;
+const app = express();
+const { env } = process;
+
+const updateDB = async (result, smsContent, destination = env.PHONE_NUM) => {
+  const sms = new SMS({
+    _id: uuid(),
+    content: smsContent,
+    destination,
+  });
+
+  const smsPromise = await sms.save()
+    .catch(
+      (err) => {
+        console.log('SMS is not updated to DB', err);
+      },
+    );
+
+  const weatherInfo = new WeatherInfo({
+    _id: uuid(),
+    weather: JSON.stringify(result),
+  });
+
+  const weatherInfoPromise = await weatherInfo.save()
+    .catch(
+      (err) => {
+        console.log('weatherInfo is not updated to DB', err);
+      },
+    );
+
+  Promise.all([smsPromise, weatherInfoPromise]);
+};
+
+const getNotification = async () => {
+  const now = moment().tz(env.CRON_TIMEZONE);
+  console.log(`Cron job run at ${now.toString()}`);
+  const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${env.WEATHER_API_CITY}&days=1`).then((response) => response.data);
+  let smsContent = '';
+  const today = result.forecast.forecastday[0].day;
+
+  if (today.maxtemp_c >= env.WEATHER_MAX_TEMPERATURE_THRESHOLD_C) {
+    smsContent = `${smsContent}Hot day! Max temperature is ${today.maxtemp_c}. `;
+    // await smsContent.concat(smsContent, `Hot day! Max temperature is ${today.maxtemp_c}. `);
+  }
+
+  if (today.maxwind_kph >= env.WEATHER_MAX_WIND_THRESHOLD_KPH) {
+    smsContent = `${smsContent}A bit windy today. `;
+  }
+
+  if (today.avgvis_km <= env.WEATHER_MIN_VIS_THRESHOLD_KM) {
+    smsContent = `${smsContent}Low visibility warning! Be careful when driving! `;
+  }
+
+  if (today.daily_will_it_rain) {
+    smsContent = `${smsContent}It may rain today with chance of ${today.daily_chance_of_rain}%. `;
+  }
+
+  if (today.daily_will_it_snow) {
+    smsContent = `${smsContent}It may snow today with chance of ${today.daily_chance_of_snow}%. `;
+  }
+
+  // if(today.uv >= 6) {
+  //     smsContent = smsContent + `High UV alert. `;
+  //     // await smsContent.concat(smsContent, `High UV alert. `);
+  // }
+
+  if (smsContent !== '') {
+    await axios.post('http://textbelt.com/text', {
+      phone: env.PHONE_NUM,
+      message: smsContent,
+      key: env.SMS_API_KEY,
+    }).then((response) => {
+      console.log(response.data);
+    });
+
+    await updateDB(result, smsContent);
+  }
+};
 
 const job = new CronJob(env.CRON_SCHEDULE, () => {
-    getNotification();
+  getNotification();
 }, null, true, env.CRON_TIMEZONE);
-
-const getNotification = async() => {
-    const now = moment().tz(env.CRON_TIMEZONE);
-    console.log(`Cron job run at ${now.toString()}`)
-    const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${env.WEATHER_API_CITY}&days=1`).then(function (response) {
-        return response.data;
-    });
-    let smsContent = "";
-    const today = result.forecast.forecastday[0].day;
-
-    if(today.maxtemp_c >= env.WEATHER_MAX_TEMPERATURE_THRESHOLD_C) {
-        smsContent = smsContent + `Hot day! Max temperature is ${today.maxtemp_c}. `;
-        // await smsContent.concat(smsContent, `Hot day! Max temperature is ${today.maxtemp_c}. `);
-    }
-
-    if(today.maxwind_kph >= env.WEATHER_MAX_WIND_THRESHOLD_KPH) {
-        smsContent = smsContent + `A bit windy today. `;
-        // await smsContent.concat(smsContent, "A bit windy. ");
-    }
-
-    if(today.avgvis_km <= env.WEATHER_MIN_VIS_THRESHOLD_KM) {
-        smsContent = smsContent + `Low visibility warning! Be careful when driving! `;
-        // await smsContent.concat(smsContent, "Low visibility warning! Be careful when driving! ");
-    }
-
-    if(today.daily_will_it_rain) {
-        smsContent = smsContent + `It may rain today with chance of ${today.daily_chance_of_rain}%. `;
-        // await smsContent.concat(smsContent, `It will rain today with chance of ${today.daily_chance_of_rain}. `);
-    }
-
-    if(today.daily_will_it_snow) {
-        smsContent = smsContent + `It may snow today with chance of ${today.daily_chance_of_snow}%. `;
-        // await smsContent.concat(smsContent, `It will snow today with chance of ${today.daily_chance_of_snow}. `);
-    }
-
-    // if(today.uv >= 6) {
-    //     smsContent = smsContent + `High UV alert. `;
-    //     // await smsContent.concat(smsContent, `High UV alert. `);
-    // }
-
-    if(smsContent !== ""){
-
-        await axios.post('http://textbelt.com/text',{
-            phone: env.PHONE_NUM,
-            message: smsContent,
-            key:env.SMS_API_KEY,
-        }).then(response => {
-            console.log(response.data);
-        });
-
-        await updateDB(result, smsContent);
-    }
-}
-
-const updateDB = async(result, smsContent, destination = env.PHONE_NUM) =>  {
-    const sms = new SMS ({
-        _id: uuid(),
-        content: smsContent,
-        destination,
-    })
-
-    const smsPromise = await sms.save()
-    .catch(
-        (err) => {
-            console.log('SMS is not updated to DB', err);
-        }
-    );
-
-    const weatherInfo = new WeatherInfo( {
-        _id: uuid(), 
-        weather: JSON.stringify(result),
-    });
-
-    const weatherInfoPromise = await weatherInfo.save()
-    .catch(
-        (err) => {
-            console.log('weatherInfo is not updated to DB', err);
-        }
-    );
-
-    Promise.all([smsPromise, weatherInfoPromise]);
-}
 
 app.listen(3000);
