@@ -4,7 +4,7 @@ const axios = require('axios');
 const moment = require('moment');
 const { v4: uuid } = require('uuid');
 
-require('dotenv').config();
+require('dotenv-flow').config();
 require('./initDB')();
 
 const SMS = require('./model/sms');
@@ -13,7 +13,7 @@ const WeatherInfo = require('./model/weatherInfo');
 const app = express();
 const { env } = process;
 
-const updateDB = async (result, smsContent, destination = env.PHONE_NUM) => {
+const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT) => {
   const sms = new SMS({
     _id: uuid(),
     content: smsContent,
@@ -43,7 +43,7 @@ const updateDB = async (result, smsContent, destination = env.PHONE_NUM) => {
 };
 
 const getNotification = async () => {
-  const now = moment().tz(env.CRON_TIMEZONE);
+  const now = moment().tz(env.CRON_JOB_TIMEZONE);
   console.log(`Cron job run at ${now.toString()}`);
   const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${env.WEATHER_API_CITY}&days=1`).then((response) => response.data);
   let smsContent = '';
@@ -51,7 +51,6 @@ const getNotification = async () => {
 
   if (today.maxtemp_c >= env.WEATHER_MAX_TEMPERATURE_THRESHOLD_C) {
     smsContent = `${smsContent}Hot day! Max temperature is ${today.maxtemp_c}. `;
-    // await smsContent.concat(smsContent, `Hot day! Max temperature is ${today.maxtemp_c}. `);
   }
 
   if (today.maxwind_kph >= env.WEATHER_MAX_WIND_THRESHOLD_KPH) {
@@ -77,7 +76,7 @@ const getNotification = async () => {
 
   if (smsContent !== '') {
     await axios.post('http://textbelt.com/text', {
-      phone: env.PHONE_NUM,
+      phone: env.PHONE_NUM_DEFAULT,
       message: smsContent,
       key: env.SMS_API_KEY,
     }).then((response) => {
@@ -87,9 +86,16 @@ const getNotification = async () => {
     await updateDB(result, smsContent);
   }
 };
+const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
+  const existingSMS = await SMS.findOne({
+    destination: env.PHONE_NUM_DEFAULT,
+    createdAt: { $gt: new Date(Date.now() - 12 * 60 * 60 * 1000) },
+  });
+  if (existingSMS === null) {
+    getNotification();
+  }
+}, null, true, env.CRON_JOB_TIMEZONE);
 
-const job = new CronJob(env.CRON_SCHEDULE, () => {
-  getNotification();
-}, null, true, env.CRON_TIMEZONE);
+job.start();
 
 app.listen(3000);
