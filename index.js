@@ -5,10 +5,10 @@ const moment = require('moment');
 const { v4: uuid } = require('uuid');
 
 require('dotenv-flow').config();
-require('./initDB')();
+require('./server/initDB')();
 
-const SMS = require('./model/sms');
-const WeatherInfo = require('./model/weatherInfo');
+const SMS = require('./server/model/sms');
+const WeatherInfo = require('./server/model/weatherInfo');
 
 const app = express();
 const { env } = process;
@@ -49,41 +49,42 @@ const getNotification = async () => {
   let smsContent = '';
   const today = result.forecast.forecastday[0].day;
 
-  if (today.maxtemp_c >= env.WEATHER_MAX_TEMPERATURE_THRESHOLD_C) {
-    smsContent = `${smsContent}Hot day! Max temperature is ${today.maxtemp_c}. `;
-  }
+  smsContent = `${smsContent}Max: ${today.maxtemp_c}C. Min: ${today.mintemp_c}C. %0a`;
 
-  if (today.maxwind_kph >= env.WEATHER_MAX_WIND_THRESHOLD_KPH) {
-    smsContent = `${smsContent}A bit windy today. `;
-  }
+  smsContent = `${smsContent}Wind: ${today.maxwind_kph}km/h. `;
 
-  if (today.avgvis_km <= env.WEATHER_MIN_VIS_THRESHOLD_KM) {
-    smsContent = `${smsContent}Low visibility warning! Be careful when driving! `;
-  }
+  smsContent = `${smsContent}It may rain today with chance of ${today.daily_chance_of_rain}%. `;
 
-  if (today.daily_will_it_rain) {
-    smsContent = `${smsContent}It may rain today with chance of ${today.daily_chance_of_rain}%. `;
-  }
-
-  if (today.daily_will_it_snow) {
-    smsContent = `${smsContent}It may snow today with chance of ${today.daily_chance_of_snow}%. `;
-  }
-
-  // if(today.uv >= 6) {
-  //     smsContent = smsContent + `High UV alert. `;
-  //     // await smsContent.concat(smsContent, `High UV alert. `);
-  // }
+  smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11). `;
 
   if (smsContent !== '') {
-    await axios.post('http://textbelt.com/text', {
-      phone: env.PHONE_NUM_DEFAULT,
-      message: smsContent,
-      key: env.SMS_API_KEY,
+    // await axios.post('http://textbelt.com/text', {
+    //   phone: env.PHONE_NUM_DEFAULT,
+    //   message: smsContent,
+    //   key: env.SMS_API_KEY,
+    // }).then((response) => {
+    //   console.log(response.data);
+    // });
+
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: 'Basic ZGVqczU4NTk6WjczOVRDR3g=', // env.SMS_AUTHORIZATION,
+    };
+
+    await axios.post('https://rest-api.d7networks.com/secure/send', {
+      to: env.PHONE_NUM_DEFAULT,
+      content: smsContent,
+      from: 'Chao',
+    }, {
+      headers,
     }).then((response) => {
       console.log(response.data);
+      updateDB(result, smsContent);
+    }).catch((err) => {
+      console.log(`---${err.response.status}: ${err.response.statusText}`);
     });
 
-    await updateDB(result, smsContent);
+    // await updateDB(result, smsContent);
   }
 };
 const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
