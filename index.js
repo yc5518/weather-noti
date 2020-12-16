@@ -96,7 +96,7 @@ const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
     getNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
-
+console.log(`---Running cron job on ${env.PHONE_NUM_DEFAULT} on schedule ${env.CRON_JOB_SCHEDULE}`);
 job.start();
 
 app.listen(3000);
