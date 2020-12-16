@@ -68,7 +68,7 @@ const getNotification = async () => {
 
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: 'Basic ZGVqczU4NTk6WjczOVRDR3g=', // env.SMS_AUTHORIZATION,
+      Authorization: env.SMS_AUTHORIZATION,
     };
 
     await axios.post('https://rest-api.d7networks.com/secure/send', {
