@@ -3,6 +3,9 @@ const express = require('express');
 const axios = require('axios');
 const moment = require('moment');
 const { v4: uuid } = require('uuid');
+const log4js = require('log4js');
+
+const logger = log4js.getLogger();
 
 require('dotenv-flow').config();
 require('./server/initDB')();
@@ -24,7 +27,7 @@ const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT)
   const smsPromise = await sms.save()
     .catch(
       (err) => {
-        console.log('SMS is not updated to DB', err);
+        logger.error(`SMS is not updated to DB: ${err}`);
       },
     );
 
@@ -36,7 +39,7 @@ const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT)
   const weatherInfoPromise = await weatherInfo.save()
     .catch(
       (err) => {
-        console.log('weatherInfo is not updated to DB', err);
+        logger.error(`weatherInfo is not updated to DB: ${err}`);
       },
     );
 
@@ -45,7 +48,7 @@ const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT)
 
 const getNotification = async () => {
   const now = moment().tz(env.CRON_JOB_TIMEZONE);
-  console.log(`Cron job run at ${now.toString()}`);
+  logger.trace(`Cron job run at ${now.toString()}`);
   const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${env.WEATHER_API_CITY}&days=1`).then((response) => response.data);
   let smsContent = '';
   const today = result.forecast.forecastday[0].day;
@@ -70,9 +73,9 @@ const getNotification = async () => {
     }).then((response) => {
       if (response.data.success) {
         updateDB(result, smsContent);
-        console.log(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`);
+        logger.trace(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`);
       } else {
-        console.log(response.data);
+        logger.warn(`SMS not sent: ${response.data}`);
       }
     });
   }
@@ -87,9 +90,9 @@ const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
     getNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
-console.log(`---Running cron job on ${env.PHONE_NUM_DEFAULT} on schedule ${env.CRON_JOB_SCHEDULE}`);
+logger.trace(`---Running cron job on ${env.PHONE_NUM_DEFAULT} on schedule ${env.CRON_JOB_SCHEDULE}`);
 job.start();
 
 app.listen(port, () => {
-  console.log(`Running Weather-naughty on port ${port}`);
+  logger.trace(`Running Weather-naughty on port ${port}`);
 });
