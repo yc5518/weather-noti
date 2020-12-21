@@ -59,7 +59,7 @@ const getNotification = async () => {
     smsContent = `${smsContent}No rain. `;
   }
 
-  smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11).`;
+  smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11). Stay safe.`;
 
   if (smsContent !== '') {
     await axios.post('http://textbelt.com/text', {
@@ -68,7 +68,7 @@ const getNotification = async () => {
       key: env.SMS_API_KEY,
     }).then((response) => {
       if (response.data.success) {
-        updateDB();
+        updateDB(result, smsContent);
       } else {
         console.log(response.data);
       }
