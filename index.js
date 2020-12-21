@@ -12,6 +12,7 @@ const WeatherInfo = require('./server/model/weatherInfo');
 
 const app = express();
 const { env } = process;
+const port = env.PORT || 8080;
 
 const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT) => {
   const sms = new SMS({
@@ -69,7 +70,7 @@ const getNotification = async () => {
     }).then((response) => {
       if (response.data.success) {
         updateDB(result, smsContent);
-		console.log(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`)
+        console.log(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`);
       } else {
         console.log(response.data);
       }
@@ -89,4 +90,6 @@ const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
 console.log(`---Running cron job on ${env.PHONE_NUM_DEFAULT} on schedule ${env.CRON_JOB_SCHEDULE}`);
 job.start();
 
-app.listen(3000);
+app.listen(port, () => {
+  console.log(`Running Weather-naughty on port ${port}`);
+});
