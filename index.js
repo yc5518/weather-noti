@@ -53,35 +53,33 @@ const getNotification = async () => {
 
   smsContent = `${smsContent}Wind: ${today.maxwind_kph}km per hour. `;
 
-  if(today.daily_will_it_rain) {
+  if (today.daily_will_it_rain) {
     smsContent = `${smsContent}${today.daily_chance_of_rain}% chance to rain. `;
-   } else {
+  } else {
     smsContent = `${smsContent}No rain. `;
   }
 
   smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11).`;
 
-  console.log(smsContent)
   if (smsContent !== '') {
     await axios.post('http://textbelt.com/text', {
       phone: env.PHONE_NUM_DEFAULT,
       message: smsContent,
       key: env.SMS_API_KEY,
     }).then((response) => {
-      
-      if(response.data.success){
+      if (response.data.success) {
         updateDB();
       } else {
         console.log(response.data);
       }
     });
-
   }
 };
 const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
+  const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
   const existingSMS = await SMS.findOne({
     destination: env.PHONE_NUM_DEFAULT,
-    createdAt: { $gt: new Date(Date.now() - 12 * 60 * 60 * 1000) },
+    createdAt: { $gt: new Date(Date.now() - recent12HoursInMilSec) },
   });
   if (existingSMS === null) {
     getNotification();
