@@ -49,42 +49,31 @@ const getNotification = async () => {
   let smsContent = '';
   const today = result.forecast.forecastday[0].day;
 
-  smsContent = `${smsContent}Max: ${today.maxtemp_c}C. Min: ${today.mintemp_c}C. %0a`;
+  smsContent = `${smsContent}Max: ${today.maxtemp_c}C. Min: ${today.mintemp_c}C. `;
 
-  smsContent = `${smsContent}Wind: ${today.maxwind_kph}km/h. `;
+  smsContent = `${smsContent}Wind: ${today.maxwind_kph}km per hour. `;
 
-  smsContent = `${smsContent}It may rain today with chance of ${today.daily_chance_of_rain}%. `;
+  if(today.daily_will_it_rain) {
+    smsContent = `${smsContent}${today.daily_chance_of_rain}% chance to rain. `;
+   } else {
+    smsContent = `${smsContent}No rain. `;
+  }
 
-  smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11). `;
+  smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11).`;
 
+  console.log(smsContent)
   if (smsContent !== '') {
-    // await axios.post('http://textbelt.com/text', {
-    //   phone: env.PHONE_NUM_DEFAULT,
-    //   message: smsContent,
-    //   key: env.SMS_API_KEY,
-    // }).then((response) => {
-    //   console.log(response.data);
-    // });
-
-    const headers = {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: env.SMS_AUTHORIZATION,
-    };
-
-    await axios.post('https://rest-api.d7networks.com/secure/send', {
-      to: env.PHONE_NUM_DEFAULT,
-      content: smsContent,
-      from: 'Chao',
-    }, {
-      headers,
+    await axios.post('http://textbelt.com/text', {
+      phone: env.PHONE_NUM_DEFAULT,
+      message: smsContent,
+      key: env.SMS_API_KEY,
     }).then((response) => {
       console.log(response.data);
-      updateDB(result, smsContent);
-    }).catch((err) => {
-      console.log(`---${err.response.status}: ${err.response.statusText}`);
+      if(response.data.success){
+        updateDB();
+      }
     });
 
-    // await updateDB(result, smsContent);
   }
 };
 const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
