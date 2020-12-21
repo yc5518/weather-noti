@@ -69,6 +69,7 @@ const getNotification = async () => {
     }).then((response) => {
       if (response.data.success) {
         updateDB(result, smsContent);
+		console.log(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`)
       } else {
         console.log(response.data);
       }
