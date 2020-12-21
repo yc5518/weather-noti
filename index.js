@@ -68,9 +68,11 @@ const getNotification = async () => {
       message: smsContent,
       key: env.SMS_API_KEY,
     }).then((response) => {
-      console.log(response.data);
+      
       if(response.data.success){
         updateDB();
+      } else {
+        console.log(response.data);
       }
     });
 
