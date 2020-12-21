@@ -6,6 +6,7 @@ const { v4: uuid } = require('uuid');
 const log4js = require('log4js');
 
 const logger = log4js.getLogger();
+logger.level = 'trace';
 
 require('dotenv-flow').config();
 require('./server/initDB')();
@@ -46,9 +47,7 @@ const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT)
   Promise.all([smsPromise, weatherInfoPromise]);
 };
 
-const getNotification = async () => {
-  const now = moment().tz(env.CRON_JOB_TIMEZONE);
-  logger.trace(`Cron job run at ${now.toString()}`);
+const sendNotification = async () => {
   const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${env.WEATHER_API_CITY}&days=1`).then((response) => response.data);
   let smsContent = '';
   const today = result.forecast.forecastday[0].day;
@@ -81,15 +80,19 @@ const getNotification = async () => {
   }
 };
 const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
+  const now = moment().tz(env.CRON_JOB_TIMEZONE);
+  logger.trace(`Cron job run at ${now.toString()}`);
+
   const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
   const existingSMS = await SMS.findOne({
     destination: env.PHONE_NUM_DEFAULT,
     createdAt: { $gt: new Date(Date.now() - recent12HoursInMilSec) },
   });
   if (existingSMS === null) {
-    getNotification();
+    sendNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
+
 logger.trace(`---Running cron job on ${env.PHONE_NUM_DEFAULT} on schedule ${env.CRON_JOB_SCHEDULE}`);
 job.start();
 
