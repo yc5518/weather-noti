@@ -8,7 +8,15 @@ const smsSchema = mongoose.Schema({
   },
   destination: {
     type: String,
-    require: true,
+    required: true,
+  },
+  isSent: {
+    type: Boolean,
+    required: true,
+  },
+  reason: {
+    type: String,
+    required: false,
   },
 }, {
   timestamps: true,

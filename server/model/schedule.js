@@ -20,8 +20,12 @@ const scheduleSchema = mongoose.Schema({
     type: Array,
     required: true,
   },
-  scheduledTime: {
-    type: Date,
+  cronJobSchedule: {
+    type: String,
+    required: true,
+  },
+  disabled: {
+    type: Boolean,
     required: true,
   },
 }, {

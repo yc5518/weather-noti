@@ -18,11 +18,14 @@ const app = express();
 const { env } = process;
 const port = env.PORT || 8080;
 
-const updateDB = async (result, smsContent, destination = env.PHONE_NUM_DEFAULT) => {
+// eslint-disable-next-line max-len
+const updateDB = async (result, smsContent, isSent = true, reason, destination = env.PHONE_NUM_DEFAULT) => {
   const sms = new SMS({
     _id: uuid(),
     content: smsContent,
     destination,
+    isSent,
+    reason,
   });
 
   const smsPromise = await sms.save()
@@ -54,6 +57,10 @@ const sendNotification = async () => {
 
   smsContent = `${smsContent}Max: ${today.maxtemp_c}C. Min: ${today.mintemp_c}C. `;
 
+  if (today.maxtemp_c > env.WEATHER_INCLEMENT_WEATHER_ALLOWANCE_THRESHOLD) {
+    smsContent = `${smsContent}(Take care and may be eligible for inclement weather allowance:-P) `;
+  }
+
   smsContent = `${smsContent}Wind: ${today.maxwind_kph}km per hour. `;
 
   if (today.daily_will_it_rain) {
@@ -71,24 +78,27 @@ const sendNotification = async () => {
       key: env.SMS_API_KEY,
     }).then((response) => {
       if (response.data.success) {
-        updateDB(result, smsContent);
         logger.trace(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`);
+        updateDB(result, smsContent, true);
       } else {
-        logger.warn(`SMS not sent: ${response.data}`);
+        logger.warn(`SMS to ${env.PHONE_NUM_DEFAULT} is not sent: ${JSON.stringify(response.data)}`);
+        updateDB(result, smsContent, false, response.data.error);
       }
     });
   }
 };
 const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
   const now = moment().tz(env.CRON_JOB_TIMEZONE);
-  logger.trace(`Cron job run at ${now.toString()}`);
+  logger.trace(`Cron job ran at ${now.toString()}`);
 
   const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
   const existingSMS = await SMS.findOne({
     destination: env.PHONE_NUM_DEFAULT,
     createdAt: { $gt: new Date(Date.now() - recent12HoursInMilSec) },
   });
-  if (existingSMS === null) {
+
+  // Not a good idea to use "env.NODE_ENV === 'production'" here, will improve later.
+  if (existingSMS === null && env.NODE_ENV === 'production') {
     sendNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
