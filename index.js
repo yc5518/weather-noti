@@ -57,11 +57,7 @@ const sendNotification = async () => {
 
   smsContent = `${smsContent}Max: ${today.maxtemp_c}C. Min: ${today.mintemp_c}C. `;
 
-  if (today.maxtemp_c > env.WEATHER_INCLEMENT_WEATHER_ALLOWANCE_THRESHOLD) {
-    smsContent = `${smsContent}(Take care and may be eligible for inclement weather allowance:-P) `;
-  }
-
-  smsContent = `${smsContent}Wind: ${today.maxwind_kph}km per hour. `;
+  smsContent = `${smsContent}Max wind: ${today.maxwind_kph}kph. `;
 
   if (today.daily_will_it_rain) {
     smsContent = `${smsContent}${today.daily_chance_of_rain}% chance to rain. `;
@@ -69,7 +65,7 @@ const sendNotification = async () => {
     smsContent = `${smsContent}No rain. `;
   }
 
-  smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11). Stay safe.`;
+  smsContent = `${smsContent}UV: ${today.uv} out of 11. Stay safe.`;
 
   if (smsContent !== '') {
     await axios.post('http://textbelt.com/text', {
@@ -78,10 +74,10 @@ const sendNotification = async () => {
       key: env.SMS_API_KEY,
     }).then((response) => {
       if (response.data.success) {
-        logger.trace(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`);
+        logger.trace(`SMS successfully sent to ${env.PHONE_NUM_DEFAULT}.`);
         updateDB(result, smsContent, true);
       } else {
-        logger.warn(`SMS to ${env.PHONE_NUM_DEFAULT} is not sent: ${JSON.stringify(response.data)}`);
+        logger.warn(`SMS to ${env.PHONE_NUM_DEFAULT} failed: ${JSON.stringify(response.data)}`);
         updateDB(result, smsContent, false, response.data.error);
       }
     });
@@ -94,11 +90,12 @@ const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
   const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
   const existingSMS = await SMS.findOne({
     destination: env.PHONE_NUM_DEFAULT,
+    isSent: true,
     createdAt: { $gt: new Date(Date.now() - recent12HoursInMilSec) },
   });
 
-  // Not a good idea to use "env.NODE_ENV === 'production'" here, will improve later.
-  if (existingSMS === null && env.NODE_ENV === 'production') {
+  // Not a good idea to use "env.NODE_ENV !== 'production'" here, will improve later.
+  if (existingSMS === null || env.NODE_ENV !== 'production') {
     sendNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
