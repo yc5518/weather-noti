@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
 
-const scheduleSchema = mongoose.Schema({
+const standardScheduleSchema = mongoose.Schema({
   _id: String,
   city: {
     type: String,
@@ -9,19 +9,19 @@ const scheduleSchema = mongoose.Schema({
   },
   destination: {
     type: String,
-    require: true,
+    required: true,
   },
   timezone: {
     type: String,
     enum: moment.tz.names(),
     required: true,
   },
-  conditions: {
-    type: Array,
+  nextRunTime: {
+    type: Date,
     required: true,
   },
-  cronJobSchedule: {
-    type: String,
+  conditions: {
+    type: Array,
     required: true,
   },
   disabled: {
@@ -31,7 +31,7 @@ const scheduleSchema = mongoose.Schema({
 }, {
   timestamps: true,
 });
-const Schedule = module.exports = mongoose.model('schedule', scheduleSchema);
+const StandardSchedule = module.exports = mongoose.model('standardSchedule', standardScheduleSchema);
 module.exports.get = (callback, limit) => {
-  Schedule.find(callback).limit(limit);
+  StandardSchedule.find(callback).limit(limit);
 };

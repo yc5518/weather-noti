@@ -13,6 +13,7 @@ require('./server/initDB')();
 
 const SMS = require('./server/model/sms');
 const WeatherInfo = require('./server/model/weatherInfo');
+const StandardSchedule = require('./server/model/standardSchedule');
 
 const app = express();
 const { env } = process;
@@ -91,14 +92,17 @@ const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
   const now = moment().tz(env.CRON_JOB_TIMEZONE);
   logger.trace(`Cron job ran at ${now.toString()}`);
 
+  StandardSchedule.find({nextRunTime:})
+
   const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
-  const existingSMS = await SMS.findOne({
+  const existingSentSMS = await SMS.findOne({
     destination: env.PHONE_NUM_DEFAULT,
+    isSent: true,
     createdAt: { $gt: new Date(Date.now() - recent12HoursInMilSec) },
   });
 
   // Not a good idea to use "env.NODE_ENV === 'production'" here, will improve later.
-  if (existingSMS === null && env.NODE_ENV === 'production') {
+  if (existingSentSMS === null && env.NODE_ENV === 'production') {
     sendNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
