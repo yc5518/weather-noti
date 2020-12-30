@@ -9,6 +9,7 @@ const smsSchema = mongoose.Schema({
   destination: {
     type: String,
     required: true,
+    index: true,
   },
   isSent: {
     type: Boolean,

@@ -6,10 +6,12 @@ const standardScheduleSchema = mongoose.Schema({
   city: {
     type: String,
     required: true,
+    index: true,
   },
   destination: {
     type: String,
     required: true,
+    unique: true,
   },
   timezone: {
     type: String,

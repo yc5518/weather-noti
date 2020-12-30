@@ -4,7 +4,12 @@ const weatherInfoSchema = mongoose.Schema({
   _id: String,
   weather: {
     type: String,
-    require: true,
+    required: true,
+  },
+  city: {
+    type: String,
+    required: true,
+    index: true,
   },
 }, {
   timestamps: true,

@@ -1,11 +1,14 @@
 const { connect, connection } = require('mongoose');
-const { config } = require('dotenv');
 
-module.exports = () => {
-  config(); // invoking the dotenv config here
+const log4js = require('log4js');
+
+const logger = log4js.getLogger();
+logger.level = 'trace';
+
+const connectDB = async () => {
   const uri = process.env.DB_HOST;
 
-  connect(uri, {
+  await connect(uri, {
     dbName: process.env.DB_NAME,
     user: process.env.DB_USER,
     pass: process.env.DB_PASS,
@@ -15,26 +18,28 @@ module.exports = () => {
     useCreateIndex: true,
   })
     .then(() => {
-      console.log('Connection estabislished with MongoDB');
+      logger.trace('Connection estabislished with MongoDB');
     })
-    .catch((error) => console.error(error.message));
+    .catch((error) => logger.error(error.message));
 
   connection.on('connected', () => {
-    console.log('Mongoose connected to DB Cluster');
+    logger.trace('Mongoose connected to DB Cluster');
   });
 
   connection.on('error', (error) => {
-    console.error(error.message);
+    logger.error(error.message);
   });
 
   connection.on('disconnected', () => {
-    console.log('Mongoose Disconnected');
+    logger.error('Mongoose Disconnected');
   });
 
   process.on('SIGINT', () => {
     connection.close(() => {
-      console.log('Mongoose connection closed on Application Timeout');
+      logger.warn('Mongoose connection closed on Application Timeout');
       process.exit(0);
     });
   });
 };
+
+module.exports = connectDB;
