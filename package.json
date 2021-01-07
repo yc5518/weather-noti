@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/yc5518/weather-noti#readme",
   "dependencies": {
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "cron": "^1.8.2",
     "dotenv-flow": "^3.2.0",
     "express": "^4.17.1",
