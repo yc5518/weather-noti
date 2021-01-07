@@ -41,6 +41,7 @@ const updateDB = async (result, smsContent, isSent = true, reason, destination =
   const weatherInfo = new WeatherInfo({
     _id: uuid(),
     weather: JSON.stringify(result),
+    city: result.location.name,
   });
 
   const weatherInfoPromise = await weatherInfo.save()
@@ -87,6 +88,8 @@ const sendNotification = async () => {
         logger.warn(`SMS to ${env.PHONE_NUM_DEFAULT} is not sent: ${JSON.stringify(response.data)}`);
         updateDB(result, smsContent, false, response.data.error);
       }
+    }).catch((err) => {
+      logger.error(`----weather api error:${err}`);
     });
   }
 };
@@ -105,7 +108,7 @@ const job = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
   });
 
   // Not a good idea to use "env.NODE_ENV === 'production'" here, will improve later.
-  if (existingSentSMS === null && env.NODE_ENV !== 'production') {
+  if (existingSentSMS === null || env.NODE_ENV !== 'production') {
     await sendNotification();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
