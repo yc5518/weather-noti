@@ -22,9 +22,13 @@ const standardScheduleSchema = mongoose.Schema({
     type: Date,
     required: true,
   },
+  lastSentTime: {
+    type: Date,
+    required: false,
+  },
   conditions: {
     type: Array,
-    required: true,
+    required: false,
   },
   disabled: {
     type: Boolean,

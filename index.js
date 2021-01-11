@@ -13,7 +13,7 @@ const { env } = process;
 // const port = env.PORT || 8080;
 
 const start = async () => {
-  logger.trace(`---Running cron job on ${env.PHONE_NUM_DEFAULT} on schedule ${env.CRON_JOB_SCHEDULE}`);
+  logger.trace(`---Running cron job on standard schedule ${env.CRON_JOB_SCHEDULE}`);
   // TODO: need to make sure cron job starts after db connected
   await connectDB();
   standardCronJob.start();

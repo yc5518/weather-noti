@@ -50,8 +50,9 @@ const updateDB = async (result, smsContent, isSent = true, reason, destination =
   Promise.all([smsPromise, weatherInfoPromise]);
 };
 
-const sendNotification = async () => {
-  const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${env.WEATHER_API_CITY}&days=1`).then((response) => response.data);
+const sendNotification = async (notificationInfo) => {
+  // eslint-disable-next-line no-underscore-dangle
+  const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${notificationInfo._id.city}&days=1`).then((response) => response.data);
   let smsContent = '';
   const today = result.forecast.forecastday[0].day;
 
@@ -74,7 +75,8 @@ const sendNotification = async () => {
   if (smsContent !== '') {
     await sendSMSViaTextBelt({
       destination: env.PHONE_NUM_DEFAULT,
-      message: smsContent,
+      // eslint-disable-next-line max-len
+      message: smsContent, // TODO: NEED to change to bulk message accessing list of destination by `notificationInfo.destinationList`
       key: env.SMS_API_KEY,
     }).then((response) => {
       if (response.data.success) {
@@ -93,19 +95,50 @@ const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
   const now = moment().tz(env.CRON_JOB_TIMEZONE);
   logger.trace(`Cron job ran at ${now.toString()}`);
 
-  // Find schedule
-  // StandardSchedule.find({nextRunTime: })
-
   const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
-  const existingSentSMS = await SMS.findOne({
-    destination: env.PHONE_NUM_DEFAULT,
-    isSent: true,
-    createdAt: { $gt: new Date(Date.now() - recent12HoursInMilSec) },
-  });
+  const nextCronJobIntervalPlus5MinsInMilSec = env.CRON_JOB_SCHEDULE + 5 * 60 * 1000;
 
-  // Not a good idea to use "env.NODE_ENV === 'production'" here, will improve later.
-  if (existingSentSMS === null || env.NODE_ENV !== 'production') {
-    await sendNotification();
+  const sendListGroupedByCity = StandardSchedule.aggregate([
+    {
+      $match: {
+        $and: [
+          {
+            nextRunTime: {
+              $lte: new Date(Date.now() + nextCronJobIntervalPlus5MinsInMilSec),
+              $gte: Date.now(),
+            },
+          },
+          {
+            lastSentTime: {
+              $lt: new Date(Date.now() - recent12HoursInMilSec),
+            },
+          },
+          {
+            disabled: false,
+          },
+        ],
+      },
+    },
+    {
+      $group: {
+        _id: {
+          city: '$city',
+        },
+        destinationList: {
+          $addToSet: '$destination',
+        },
+      },
+    },
+  ]);
+
+  // Not a good idea to use "env.NODE_ENV !== 'production'" here, will improve later.
+  if (sendListGroupedByCity !== null || env.NODE_ENV !== 'production') {
+    let sendNotificationPromiseArray;
+
+    // eslint-disable-next-line max-len
+    await sendListGroupedByCity.map((pair) => sendNotificationPromiseArray.push(sendNotification(pair)));
+
+    await sendNotificationPromiseArray.promiseAll();
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
 
