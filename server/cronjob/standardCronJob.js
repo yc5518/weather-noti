@@ -74,9 +74,9 @@ const sendNotification = async (notificationInfo) => {
 
   if (smsContent !== '') {
     await sendSMSViaTextBelt({
-      destination: env.PHONE_NUM_DEFAULT,
       // eslint-disable-next-line max-len
-      message: smsContent, // TODO: NEED to change to bulk message accessing list of destination by `notificationInfo.destinationList`
+      destination: env.PHONE_NUM_DEFAULT, // TODO: NEED to change to bulk message accessing list of destination by `notificationInfo.destinationList`
+      message: smsContent,
       key: env.SMS_API_KEY,
     }).then((response) => {
       if (response.data.success) {
@@ -138,7 +138,7 @@ const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
     // eslint-disable-next-line max-len
     await sendListGroupedByCity.map((pair) => sendNotificationPromiseArray.push(sendNotification(pair)));
 
-    await sendNotificationPromiseArray.promiseAll();
+    await Promise.all(sendListGroupedByCity);
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
 
