@@ -16,9 +16,12 @@ const WeatherInfo = require('../model/weatherInfo');
 const StandardSchedule = require('../model/standardSchedule');
 
 const { env } = process;
+const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
+// eslint-disable-next-line max-len
+const nextCronJobIntervalPlusXMinsInMilSec = env.CRON_JOB_SCHEDULE_STANDARD + env.CRON_JOB_PLUS_X_MINS * 60 * 1000;
 
 // eslint-disable-next-line max-len
-const updateDB = async (result, smsContent, isSent = true, reason, destination = env.PHONE_NUM_DEFAULT) => {
+const updateDB = async (result, smsContent, isSent = true, reason, destination = env.PHONE_NUM_DEFAULT, queryTimePeriod) => {
   const sms = new SMS({
     _id: uuid(),
     content: smsContent,
@@ -47,10 +50,30 @@ const updateDB = async (result, smsContent, isSent = true, reason, destination =
       },
     );
 
-  Promise.all([smsPromise, weatherInfoPromise]);
+  const updateNextRuntimePromise = await StandardSchedule.updateMany({
+    nextRunTime: {
+      $gte: queryTimePeriod.start,
+      $lte: queryTimePeriod.end,
+    },
+    lastSentTime: {
+      $lt: new Date(Date.now() - recent12HoursInMilSec),
+    },
+    disabled: false,
+  },
+  {
+    $inc: {
+      nextRunTime: 24 * 60 * 60 * 1000, // Set nextRunTime to same time next day
+    },
+  });
+
+  const promiseList = [smsPromise, weatherInfoPromise];
+  if (isSent) {
+    promiseList.push(updateNextRuntimePromise);
+  }
+  Promise.all(promiseList);
 };
 
-const sendNotification = async (notificationInfo) => {
+const sendNotification = async (notificationInfo, queryTimePeriod) => {
   // eslint-disable-next-line no-underscore-dangle
   const result = await axios.get(`http://api.weatherapi.com/v1/forecast.json?key=${env.WEATHER_API_KEY}&q=${notificationInfo._id.city}&days=1`).then((response) => response.data);
   let smsContent = '';
@@ -72,31 +95,33 @@ const sendNotification = async (notificationInfo) => {
 
   smsContent = `${smsContent}UV level: ${today.uv}. (Max is 11). Stay safe.`;
 
-  if (smsContent !== '') {
-    await sendSMSViaTextBelt({
-      // eslint-disable-next-line max-len
-      destination: env.PHONE_NUM_DEFAULT, // TODO: NEED to change to bulk message accessing list of destination by `notificationInfo.destinationList`
+  if (smsContent !== '' && notificationInfo.destinationList.length !== 0) {
+    // TODO: convert to promise.all format and use bulk message sending method
+    await notificationInfo.destinationList.map((destination) => sendSMSViaTextBelt({
+      destination,
       message: smsContent,
       key: env.SMS_API_KEY,
     }).then((response) => {
       if (response.data.success) {
         logger.trace(`SMS sent to ${env.PHONE_NUM_DEFAULT}.`);
-        updateDB(result, smsContent, true);
+        updateDB(result, smsContent, true, null, destination, queryTimePeriod);
       } else {
         logger.warn(`SMS to ${env.PHONE_NUM_DEFAULT} is not sent: ${JSON.stringify(response.data)}`);
-        updateDB(result, smsContent, false, response.data.error);
+        updateDB(result, smsContent, false, response.data.error, destination);
       }
     }).catch((err) => {
       logger.error(`----weather api error:${err}`);
-    });
+    }));
   }
 };
-const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
+const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE_STANDARD, async () => {
   const now = moment().tz(env.CRON_JOB_TIMEZONE);
   logger.trace(`Cron job ran at ${now.toString()}`);
 
-  const recent12HoursInMilSec = 12 * 60 * 60 * 1000;
-  const nextCronJobIntervalPlus5MinsInMilSec = env.CRON_JOB_SCHEDULE + 5 * 60 * 1000;
+  const queryTimePeriod = {
+    start: Date.now(),
+    end: new Date(Date.now() + nextCronJobIntervalPlusXMinsInMilSec),
+  };
 
   const sendListGroupedByCity = StandardSchedule.aggregate([
     {
@@ -104,8 +129,8 @@ const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
         $and: [
           {
             nextRunTime: {
-              $lte: new Date(Date.now() + nextCronJobIntervalPlus5MinsInMilSec),
-              $gte: Date.now(),
+              $gte: queryTimePeriod.start,
+              $lte: queryTimePeriod.end,
             },
           },
           {
@@ -136,9 +161,9 @@ const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE, async () => {
     let sendNotificationPromiseArray;
 
     // eslint-disable-next-line max-len
-    await sendListGroupedByCity.map((pair) => sendNotificationPromiseArray.push(sendNotification(pair)));
+    await sendListGroupedByCity.map((cityDestiPair) => sendNotificationPromiseArray.push(sendNotification(cityDestiPair, queryTimePeriod)));
 
-    await Promise.all(sendListGroupedByCity);
+    await Promise.all(sendNotificationPromiseArray);
   }
 }, null, true, env.CRON_JOB_TIMEZONE);
 
