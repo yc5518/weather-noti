@@ -55,7 +55,10 @@ const sendNotification = async () => {
   let smsContent = '';
   const today = result.forecast.forecastday[0].day;
 
-  smsContent = `${smsContent}Max: ${today.maxtemp_c}C. Min: ${today.mintemp_c}C. `;
+  const maxTemp = Number(today.maxtemp_c) + 6;
+  const minTemp = Number(today.mintemp_c) + 6;
+
+  smsContent = `${smsContent}Max: ${maxTemp}C. Min: ${minTemp}C. `;
 
   smsContent = `${smsContent}Max wind: ${today.maxwind_kph}kph. `;
 
