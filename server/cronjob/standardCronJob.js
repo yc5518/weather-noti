@@ -150,7 +150,7 @@ const standardCronJob = new CronJob(env.CRON_JOB_SCHEDULE_STANDARD, async () => 
           city: '$city',
         },
         destinationList: {
-          $addToSet: '$destination',
+          $addToSet: { $push: '$destination' },
         },
       },
     },
