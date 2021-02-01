@@ -70,7 +70,7 @@ const sendNotification = async () => {
     smsContent = `${smsContent}No rain. `;
   }
 
-  smsContent = `${smsContent}UV: ${today.uv} out of 11. Stay safe.`;
+  smsContent = `${smsContent}UV: ${today.uv} out of 11.`;
 
   if (smsContent !== '') {
     await axios.post('http://textbelt.com/text', {
